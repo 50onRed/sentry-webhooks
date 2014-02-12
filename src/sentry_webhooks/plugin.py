@@ -5,6 +5,7 @@ sentry_webhooks.plugin
 :copyright: (c) 2012 by the Sentry Team, see AUTHORS for more details.
 :license: BSD, see LICENSE for more details.
 """
+import json
 
 import logging
 import ipaddr
@@ -14,7 +15,6 @@ import urllib2
 
 from django.conf import settings
 from django import forms
-from django.utils import simplejson
 from django.utils.translation import ugettext_lazy as _
 from urlparse import urlparse
 
@@ -55,6 +55,18 @@ class WebHooksOptionsForm(forms.Form):
             'class': 'span6', 'placeholder': 'https://getsentry.com/callback/url'}),
         help_text=_('Enter callback URLs to POST new events to (one per line).'))
 
+    channel = forms.CharField(
+        label=_('Channels'),
+        widget=forms.TextInput(attrs={
+            'class': 'span6', 'placeholder': '#general'}),
+        help_text=_('Enter the channel to send the event.'))
+
+    username = forms.CharField(
+            label=_('Username'),
+            widget=forms.TextInput(attrs={
+                'class': 'span6', 'placeholder': 'webhookbot'}),
+            help_text=_('Enter the username to send the message from.'))
+
     def clean_url(self):
         value = self.cleaned_data.get('url')
         if not is_valid_url(value):
@@ -82,6 +94,34 @@ class WebHooksPlugin(Plugin):
 
     def is_configured(self, project, **kwargs):
         return bool(self.get_option('urls', project))
+
+    def get_slack_payload(self, group, event):
+        payload = {
+            'text': 'New Sentry Issue',
+            'channel': self.get_option('channel', group.project),
+            'username': self.get_option('username', group.project),
+            'icon_emoji': ':ghost:',
+            'attachments': [
+                {
+                    'fallback': 'Your code is bad and you should feel bad',
+                    'text': 'A new error has been reported',
+                    'color': 'danger',
+                    'fields': [
+                        {
+                            'title': group.project.name,
+                            'value': event.message
+                        },
+                        {
+                            'title': 'url',
+                            'value': group.get_absolute_url()
+
+                        }
+                    ]
+
+                }
+            ]
+        }
+        return payload
 
     def get_group_data(self, group, event):
         data = {
@@ -116,7 +156,7 @@ class WebHooksPlugin(Plugin):
         if not self.is_configured(group.project):
             return
 
-        data = simplejson.dumps(self.get_group_data(group, event))
+        data = json.dumps(self.get_slack_payload(group, event))
         for url in self.get_webhook_urls(group.project):
             if not is_valid_url(url):
                 self.logger.error('URL is not valid: %s', url)
