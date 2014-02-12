@@ -93,9 +93,11 @@ class WebHooksPlugin(Plugin):
     logger = logging.getLogger('sentry.plugins.webhooks')
 
     def is_configured(self, project, **kwargs):
+        self.logger.debug('Web hooks configured')
         return bool(self.get_option('urls', project))
 
     def get_slack_payload(self, group, event):
+        self.logger.debug('creating slack payload')
         payload = {
             'text': 'New Sentry Issue',
             'channel': self.get_option('channel', group.project),
@@ -142,6 +144,7 @@ class WebHooksPlugin(Plugin):
         return filter(bool, self.get_option('urls', project).strip().splitlines())
 
     def send_webhook(self, url, data):
+        self.logger.debug('Sending webhook')
         req = urllib2.Request(url, data)
         req.add_header('User-Agent', 'sentry-webhooks/%s' % self.version)
         req.add_header('Content-Type', 'application/json')
@@ -150,10 +153,13 @@ class WebHooksPlugin(Plugin):
         return resp
 
     def post_process(self, group, event, is_new, is_sample, **kwargs):
+        self.logger.debug('in post_process')
         if not is_new:
+            self.logger.debug('this is not new bailing out!')
             return
 
         if not self.is_configured(group.project):
+            self.logger.debug('Plugin is not configured returning')
             return
 
         data = json.dumps(self.get_slack_payload(group, event))
