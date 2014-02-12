@@ -22,7 +22,7 @@ install_requires = [
 
 setup(
     name='sentry-webhooks',
-    version='0.2.0',
+    version='0.2.1',
     author='David Cramer',
     author_email='dcramer@gmail.com',
     url='http://github.com/getsentry/sentry-webhooks',
